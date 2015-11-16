@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>Pml by BasvandeKerkhof</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name">Pml</h1>
+      <h2 class="project-tagline">Practical Machine Learning Coursera</h2>
+      <a href="https://github.com/BasvandeKerkhof/PML" class="btn">View on GitHub</a>
+      <a href="https://github.com/BasvandeKerkhof/PML/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/BasvandeKerkhof/PML/tarball/master" class="btn">Download .tar.gz</a>
+    </section>
+
+    <section class="main-content">
+      <hr>
+
+<p>title: "Practical Machine Learning Course Project"
+author: "Bas van de Kerkhof"
+date: "Monday, November 16, 2015"</p>
+
+<h2>
+<a id="output-html_document" class="anchor" href="#output-html_document" aria-hidden="true"><span class="octicon octicon-link"></span></a>output: html_document</h2>
+
+<p>This report contains the documentation for the course project of the practical machine learning coursera course.</p>
+
+<h1>
+<a id="background" class="anchor" href="#background" aria-hidden="true"><span class="octicon octicon-link"></span></a>Background</h1>
+
+<p>Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. </p>
+
+<p>In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. </p>
+
+<p>The data used to train our model are available here: 
+<a href="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv">https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv</a></p>
+
+<p>The data used to test our model on are available here:
+<a href="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv">https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv</a></p>
+
+<h1>
+<a id="model-estimation" class="anchor" href="#model-estimation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Model estimation</h1>
+
+<p>We will now describe how we trained our model and used it to predict the outcome based on the test data.</p>
+
+<div class="highlight highlight-source-r"><pre><span class="pl-c">#Set global cache option to TRUE to reduce compiling time.</span>
+<span class="pl-e">knitr</span><span class="pl-k">::</span><span class="pl-smi">opts_chunk</span><span class="pl-k">$</span>set(<span class="pl-v">cache</span><span class="pl-k">=</span><span class="pl-c1">TRUE</span>)</pre></div>
+
+<h2>
+<a id="preprocessing" class="anchor" href="#preprocessing" aria-hidden="true"><span class="octicon octicon-link"></span></a>Preprocessing</h2>
+
+<p>First we load some packages used for out model estimation. Next we set the seed for reproducibility and load the data.</p>
+
+<div class="highlight highlight-source-r"><pre><span class="pl-c">#Load required packages</span>
+library(<span class="pl-smi">caret</span>)
+library(<span class="pl-smi">randomForest</span>)
+
+<span class="pl-c">#Set working directory correctly</span>
+setwd(<span class="pl-s"><span class="pl-pds">"</span>~/Data Science/Practical Machine Learning/Course_project<span class="pl-pds">"</span></span>)
+
+<span class="pl-c">#Set seed for reproducibility</span>
+set.seed(<span class="pl-c1">39</span>)
+
+<span class="pl-c">#Load the data</span>
+<span class="pl-smi">training_data</span> <span class="pl-k">&lt;-</span> read.csv(<span class="pl-s"><span class="pl-pds">"</span>pml-training.csv<span class="pl-pds">"</span></span>)
+<span class="pl-smi">test_data</span> <span class="pl-k">&lt;-</span> read.csv(<span class="pl-s"><span class="pl-pds">"</span>pml-testing.csv<span class="pl-pds">"</span></span>)</pre></div>
+
+<h2>
+<a id="cleaning-the-data" class="anchor" href="#cleaning-the-data" aria-hidden="true"><span class="octicon octicon-link"></span></a>Cleaning the data</h2>
+
+<p>When we look at the top part of the data we see that there are some columns contain a lot of NA-values. We want to remove these columns.</p>
+
+<div class="highlight highlight-source-r"><pre><span class="pl-c">#Calculate percentage of NA values per column</span>
+<span class="pl-smi">nof_rows</span> <span class="pl-k">&lt;-</span> nrow(<span class="pl-smi">training_data</span>)
+<span class="pl-smi">perc_NA</span> <span class="pl-k">&lt;-</span> colSums(is.na(<span class="pl-smi">training_data</span>))<span class="pl-k">/</span><span class="pl-smi">nof_rows</span>
+
+<span class="pl-c">#Keep the columns which have less than 10% NA values</span>
+<span class="pl-smi">keep_cols</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">perc_NA</span> <span class="pl-k">&lt;</span> <span class="pl-c1">0.1</span>
+<span class="pl-smi">training_data</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">training_data</span>[,<span class="pl-smi">keep_cols</span>]</pre></div>
+
+<p>We also delete variables which have near zero variance since they will not contribute to the model estimation.</p>
+
+<div class="highlight highlight-source-r"><pre><span class="pl-c">#Find near zero variance variables and delete them</span>
+<span class="pl-smi">nzv_train</span> <span class="pl-k">&lt;-</span> nearZeroVar(<span class="pl-smi">training_data</span>, <span class="pl-v">saveMetrics</span><span class="pl-k">=</span><span class="pl-c1">TRUE</span>)
+<span class="pl-smi">training_data</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">training_data</span>[, <span class="pl-smi">nzv_train</span><span class="pl-k">$</span><span class="pl-smi">nzv</span><span class="pl-k">==</span><span class="pl-c1">FALSE</span>]</pre></div>
+
+<p>Lets observe the remaining training data to see if further processing is needed.</p>
+
+<div class="highlight highlight-source-r"><pre><span class="pl-c">#Check for complete cases in remainder of data</span>
+sum(<span class="pl-k">!</span>complete.cases(<span class="pl-smi">training_data</span>))
+head(<span class="pl-smi">training_data</span>)</pre></div>
+
+<p>We see that all rows are complete, which is good. But we also see that the first six columns do not contain any usefull information for the model estimation. Therefore we remove these columns.
+The remaining training data is partitioned into a training set and a cross validation set.</p>
+
+<h1>
+<a id="estimate-the-model" class="anchor" href="#estimate-the-model" aria-hidden="true"><span class="octicon octicon-link"></span></a>Estimate the model</h1>
+
+<div class="highlight highlight-source-r"><pre><span class="pl-c">#Delete the first six columns, since they do not contain valuable information</span>
+<span class="pl-smi">training_data</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">training_data</span>[,<span class="pl-k">-</span>(<span class="pl-c1">1</span><span class="pl-k">:</span><span class="pl-c1">6</span>)]
+
+<span class="pl-c">#Partition the data into training and cross validation set</span>
+<span class="pl-smi">inTrain</span> <span class="pl-k">&lt;-</span> createDataPartition(<span class="pl-smi">training_data</span><span class="pl-k">$</span><span class="pl-smi">classe</span>, <span class="pl-v">p</span><span class="pl-k">=</span><span class="pl-c1">0.70</span>, <span class="pl-v">list</span><span class="pl-k">=</span><span class="pl-c1">F</span>)
+<span class="pl-smi">train_data</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">training_data</span>[<span class="pl-smi">inTrain</span>, ]
+<span class="pl-smi">CV_data</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">training_data</span>[<span class="pl-k">-</span><span class="pl-smi">inTrain</span>, ]</pre></div>
+
+<p>Now we have got a cleaned training dataset on which we can estimate our model. We will use a random forest to estimate our model since this is one of the most accurate algorithms out ther. We use the randomForest function from the randomForest package since this function is much faster than the train function from the caret package.
+We cross validate the estimated model using our partition of cross validation data.</p>
+
+<div class="highlight highlight-source-r"><pre><span class="pl-c">#Determine the model using a random forest</span>
+<span class="pl-smi">model</span> <span class="pl-k">&lt;-</span> randomForest(<span class="pl-smi">classe</span> <span class="pl-k">~</span>. , <span class="pl-v">data</span><span class="pl-k">=</span><span class="pl-smi">train_data</span>)
+
+<span class="pl-c">#Predict our model using the cross validation data and show outcome</span>
+<span class="pl-smi">CV_prediction</span> <span class="pl-k">&lt;-</span> predict(<span class="pl-smi">model</span>, <span class="pl-smi">CV_data</span>)
+confusionMatrix(<span class="pl-smi">CV_data</span><span class="pl-k">$</span><span class="pl-smi">classe</span>, <span class="pl-smi">CV_prediction</span>)</pre></div>
+
+<p>When we look at the results of the confusion matrix we see that we get an accuracy of 99.52%. An hence we expect the out of sample error to be 0.48% (=1-accuracy).</p>
+
+<p>Finally we use our model for prediction on the test data. Of course we do not pre process the test data since otherwise we would be manipulating the test results. We also convert the outcome to the desired format for automated grading.</p>
+
+<h1>
+<a id="predict-the-outcome" class="anchor" href="#predict-the-outcome" aria-hidden="true"><span class="octicon octicon-link"></span></a>Predict the outcome</h1>
+
+<div class="highlight highlight-source-r"><pre><span class="pl-c">#Predict our model using the test_data (which of course we did not preprocess)</span>
+<span class="pl-smi">prediction</span> <span class="pl-k">&lt;-</span> predict(<span class="pl-smi">model</span>, <span class="pl-smi">test_data</span>)
+
+<span class="pl-c">#Write files to desired output for automatic grading</span>
+<span class="pl-v">pml_write_files</span> <span class="pl-k">=</span> <span class="pl-k">function</span>(<span class="pl-smi">x</span>){
+    <span class="pl-v">n</span> <span class="pl-k">=</span> length(<span class="pl-smi">x</span>)
+    <span class="pl-k">for</span>(<span class="pl-smi">i</span> <span class="pl-k">in</span> <span class="pl-c1">1</span><span class="pl-k">:</span><span class="pl-smi">n</span>){
+        <span class="pl-v">filename</span> <span class="pl-k">=</span> paste0(<span class="pl-s"><span class="pl-pds">"</span>problem_id_<span class="pl-pds">"</span></span>,<span class="pl-smi">i</span>,<span class="pl-s"><span class="pl-pds">"</span>.txt<span class="pl-pds">"</span></span>)
+        write.table(<span class="pl-smi">x</span>[<span class="pl-smi">i</span>],<span class="pl-v">file</span><span class="pl-k">=</span><span class="pl-smi">filename</span>,<span class="pl-v">quote</span><span class="pl-k">=</span><span class="pl-c1">FALSE</span>,<span class="pl-v">row.names</span><span class="pl-k">=</span><span class="pl-c1">FALSE</span>,<span class="pl-v">col.names</span><span class="pl-k">=</span><span class="pl-c1">FALSE</span>)
+    }
+}
+
+pml_write_files(<span class="pl-smi">prediction</span>)</pre></div>
+
+      <footer class="site-footer">
+        <span class="site-footer-owner"><a href="https://github.com/BasvandeKerkhof/PML">Pml</a> is maintained by <a href="https://github.com/BasvandeKerkhof">BasvandeKerkhof</a>.</span>
+
+        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
+      </footer>
+
+    </section>
+
+  
+  </body>
+</html>
