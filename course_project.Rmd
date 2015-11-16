@@ -1,0 +1,123 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Bas van de Kerkhof"
+date: "Monday, November 16, 2015"
+output: html_document
+---
+
+This report contains the documentation for the course project of the practical machine learning coursera course.
+
+#Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+The data used to train our model are available here: 
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The data used to test our model on are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+#Model estimation
+We will now describe how we trained our model and used it to predict the outcome based on the test data.
+
+```{r setup, include=FALSE}
+#Set global cache option to TRUE to reduce compiling time.
+knitr::opts_chunk$set(cache=TRUE)
+```
+
+##Preprocessing
+First we load some packages used for out model estimation. Next we set the seed for reproducibility and load the data.
+```{r, message=FALSE, warning=FALSE}
+#Load required packages
+library(caret)
+library(randomForest)
+
+#Set working directory correctly
+setwd("~/Data Science/Practical Machine Learning/Course_project")
+
+#Set seed for reproducibility
+set.seed(39)
+
+#Load the data
+training_data <- read.csv("pml-training.csv")
+test_data <- read.csv("pml-testing.csv")
+```
+
+##Cleaning the data
+When we look at the top part of the data we see that there are some columns contain a lot of NA-values. We want to remove these columns.
+
+```{r}
+#Calculate percentage of NA values per column
+nof_rows <- nrow(training_data)
+perc_NA <- colSums(is.na(training_data))/nof_rows
+
+#Keep the columns which have less than 10% NA values
+keep_cols <- perc_NA < 0.1
+training_data <- training_data[,keep_cols]
+```
+
+We also delete variables which have near zero variance since they will not contribute to the model estimation.
+
+```{r}
+#Find near zero variance variables and delete them
+nzv_train <- nearZeroVar(training_data, saveMetrics=TRUE)
+training_data <- training_data[, nzv_train$nzv==FALSE]
+```
+
+Lets observe the remaining training data to see if further processing is needed.
+```{r}
+#Check for complete cases in remainder of data
+sum(!complete.cases(training_data))
+head(training_data)
+```
+
+We see that all rows are complete, which is good. But we also see that the first six columns do not contain any usefull information for the model estimation. Therefore we remove these columns.
+The remaining training data is partitioned into a training set and a cross validation set.
+
+#Estimate the model
+```{r}
+#Delete the first six columns, since they do not contain valuable information
+training_data <- training_data[,-(1:6)]
+
+#Partition the data into training and cross validation set
+inTrain <- createDataPartition(training_data$classe, p=0.70, list=F)
+train_data <- training_data[inTrain, ]
+CV_data <- training_data[-inTrain, ]
+```
+
+Now we have got a cleaned training dataset on which we can estimate our model. We will use a random forest to estimate our model since this is one of the most accurate algorithms out ther. We use the randomForest function from the randomForest package since this function is much faster than the train function from the caret package.
+We cross validate the estimated model using our partition of cross validation data.
+
+```{r}
+#Determine the model using a random forest
+model <- randomForest(classe ~. , data=train_data)
+
+#Predict our model using the cross validation data and show outcome
+CV_prediction <- predict(model, CV_data)
+confusionMatrix(CV_data$classe, CV_prediction)
+```
+
+When we look at the results of the confusion matrix we see that we get an accuracy of 99.52%. An hence we expect the out of sample error to be 0.48% (=1-accuracy).
+
+Finally we use our model for prediction on the test data. Of course we do not pre process the test data since otherwise we would be manipulating the test results. We also convert the outcome to the desired format for automated grading.
+
+#Predict the outcome
+```{r}
+#Predict our model using the test_data (which of course we did not preprocess)
+prediction <- predict(model, test_data)
+
+#Write files to desired output for automatic grading
+pml_write_files = function(x){
+    n = length(x)
+    for(i in 1:n){
+        filename = paste0("problem_id_",i,".txt")
+        write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+    }
+}
+
+pml_write_files(prediction)
+```
+
+
+
